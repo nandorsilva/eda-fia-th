@@ -1,0 +1,143 @@
+asyncapi: 3.0.0
+id: "urn:com:kafka:corp:debezium:server"
+info:
+  title: Preco
+  version: 1.0.0
+  contact:
+    name: "Api Suporte"
+    url: "http://servicenow.com.br"
+    email: "suporte@email.com.br"
+  description: |-
+    Evento de mudança de preço.
+    ### Cenarios de alterações de preços:
+
+    * Alteração do produto altera o preço
+    * Novo produto gera um evento de alteração de preço 📈
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+defaultContentType: application/json
+servers:
+  production:
+    host: kafka-broker:29092
+    protocol: kafka-secure
+    description: Test broker secured with scramSha256
+    security:
+      - $ref: '#/components/securitySchemes/saslScram'
+    tags:
+      - name: env:test-scram
+        description: >-
+          This environment is meant for running internal tests through
+          scramSha256
+      - name: kind:remote
+        description: This server is a remote server. Not exposed by the application
+      - name: visibility:private
+        description: This resource is private and only available to certain users
+  mtls-connections:
+    host: test.mykafkacluster.org:28092
+    protocol: kafka-secure
+    description: Test broker secured with X509
+    security:
+      - $ref: '#/components/securitySchemes/certs'
+    tags:
+      - name: env:test-mtls
+        description: This environment is meant for running internal tests through mtls
+      - name: kind:remote
+        description: This server is a remote server. Not exposed by the application
+      - name: visibility:private
+        description: This resource is private and only available to certain users
+  homologação:
+    host: kafkahlg.viavarejo.com.br:443
+    protocol:  kafka
+    protocolVersion: "1.0.0"
+    description: Esse é o cluster de homologação  
+    tags:
+      - name: env:hlg
+        description: Ambiente de homologação   
+      
+channels:
+  preco-alterado:
+    address: inteligencia-comercical.preco.alterado
+    messages:
+      Preco:
+        $ref: '#/components/messages/Preco'
+    description: O topico que cada produto alterado pode ser consumido e produzido.
+
+operations:
+  precoAlterado:
+    action: receive
+    channel:
+      $ref: '#/channels/preco-alterado'
+    summary: >-
+      Informar a cada alteração de preço do produto.
+    traits:
+      - $ref: '#/components/operationTraits/kafka'
+    messages:
+      - $ref: '#/channels/preco-alterado/messages/Preco'
+ 
+components:
+  messages:
+    Preco:
+      name: preco-alterado
+      title: Preco alterado
+      summary: >-
+        Informar a cada alteração do produto.
+      contentType: application/json
+      traits:
+        - $ref: '#/components/messageTraits/commonHeaders'
+      payload:
+        $ref: '#/components/schemas/precoPayload'
+      examples:
+        - name: produto
+          summary: Exemplo De produto         
+          payload: 
+            idSku: '{{uuid()}}'
+            descricao: '{{randomFullName()}}'
+            preco: '{{randomInt(0,5000)}}'       
+            data-alteracao: '{{now()}}'
+  schemas:
+    precoPayload:
+      type: object
+      properties:
+        idSku:
+          type: integer
+          minimum: 0
+          description: Identificação do produto
+        descricao:
+            type: string
+            description: Descrição do produto
+        preco:
+            type: number
+            description: Preço do produto
+        data-alteracao:
+          $ref: '#/components/schemas/date'    
+    date:
+      type: string
+      format: date-time     
+  securitySchemes:
+    saslScram:
+      type: scramSha256
+      description: Provide your username and password for SASL/SCRAM authentication
+    certs:
+      type: X509
+      description: Download the certificate files from service provider
+  parameters:
+    streetlightId:
+      description: The ID of the streetlight.
+  messageTraits:
+    commonHeaders:
+      headers:
+        type: object
+        properties:
+          my-app-header:
+            type: integer
+            minimum: 0
+            maximum: 100
+  operationTraits:
+    kafka:
+      bindings:
+        kafka:
+          clientId:
+            type: string
+            enum:
+              - my-app-id

@@ -1,0 +1,12 @@
+{
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "tasks.max": "1",
+    "database.hostname": "postgres",
+    "database.port": "5432",
+    "database.user": "postgres",
+    "database.password": "postgres",
+    "database.dbname" : "postgres",
+    "topic.prefix": "postgres",
+    "value.converter": "io.debezium.converters.CloudEventsConverter",
+    "schema.include.list": "inventory"
+}
