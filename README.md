@@ -10,20 +10,16 @@
 * Docker-Compose
 
 
-# Instalação Kafka 
-
-[LAB KAFKA](../lab-kafka/README.md)
-
 
 ## Kafka Connect
 
-![Exemplo Kafka Conect](../content/kafka-connect-minio.png)
+![Exemplo Kafka Conect](content/kafka-connect-minio.png)
 
 
 ### Realizando download dos plugins dos conectores
 
 
-Criando a imagem junto com o plugin do Debezium Postgres
+Criando a imagem junto com o plugin do Debezium SQL Server
 
 
 ```
