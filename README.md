@@ -13,7 +13,7 @@
 
 ## Kafka Connect
 
-![Exemplo Kafka Conect](content/kafka-connect-minio.png)
+![Exemplo Kafka Conect](content/arc-01.png)
 
 
 ### Realizando download dos plugins dos conectores
@@ -40,7 +40,7 @@ docker image push <<usuario>>/kafka-connet-debezium-lab:v213
 
 Imagem criada? ...mas antes
 
-Altere o arquivo ambiente/docker-compose.yaml da imagem criada no serviço `connect`
+Altere o arquivo docker-compose.yaml da imagem criada no serviço `connect`
 
 
 ```
@@ -122,7 +122,9 @@ http http://localhost:8083/connectors/connector-sql/status
 
 ```
 
-### E o Akhq ?
+### Navegando pelo Akhq ?
+
+* AKHQ http://localhost:8080/ui
 
 Vamos tirar o comentario do conector no serviço akhq do arquivo docker-compose caso ainda o tenha.
 
@@ -158,7 +160,7 @@ kafka-topics --bootstrap-server localhost:9092 --list
 
 ```
 
-kafka-console-consumer --bootstrap-server localhost:9092 --topic sqldebezium.dbo.produtos --property print.headers=true  --property print.timestamp=true --property print.key=true --property print.value=true --property print.partition=true --from-beginning
+kafka-console-consumer --bootstrap-server localhost:9092 --topic server.dbEcommerce.dbo.produtos --property print.headers=true  --property print.timestamp=true --property print.key=true --property print.value=true --property print.partition=true --from-beginning
 
 
 ```
@@ -201,11 +203,17 @@ O aplicativo usa a API OpenTracing para criar extensões de rastreamento e anexa
 
 O cliente geralmente não envia todos os rastreamentos ao agente, mas geralmente apenas uma pequena porcentagem, uma amostragem.
 
+> http://localhost:16686/
+
 ## Instalando  Jaeger
 
 ```
 
-docker-compose  -f ambiente/docker-compose.yaml -f jaeger/docker-compose-jaeger.yaml up -d zk kafka-broker jaeger sqlserver connect
+docker-compose up -d jaeger-all-in-one 
+
+docker container ls
+
+
 
 ```
 
@@ -237,14 +245,14 @@ docker exec -it kafka-broker /bin/bash
 
 kafka-topics --bootstrap-server localhost:9092 --list 
 
- kafka-console-consumer --bootstrap-server localhost:9092 --topic sqldebezium.dbo.produtos  --property print.timestamp=true --property print.key=true --property print.headers=true --property print.value=true --property print.partition=true --from-beginning
+kafka-console-consumer --bootstrap-server localhost:9092 --topic server.dbEcommerce.dbo.produtos --property print.headers=true  --property print.timestamp=true --property print.key=true --property print.value=true --property print.partition=true --from-beginning
 
 ```
 
 
-### AsyncApi
+# AsyncApi
 
-# Criando um arquiro AsynAPI
+## Criando um arquiro AsyncAPI
 
 https://studio.asyncapi.com/
 
@@ -295,8 +303,7 @@ kafka-console-consumer --bootstrap-server localhost:9092 --topic <<nome do tópi
 Entrando no container cli
 
 ```
-cd ambiente
-docker-compose up -d kafka-broker zk connect ksqldb-server ksqldb-cli 
+docker-compose up -d  ksqldb-server ksqldb-cli 
 docker-compose exec ksqldb-cli ksql http://ksqldb-server:8088
 ```
 
@@ -305,7 +312,8 @@ docker-compose exec ksqldb-cli ksql http://ksqldb-server:8088
 
 Eu outro terminal crie um tópico
 ```
-docker exec -it kafka /bin/bash
+docker exec -it kafka-broker /bin/bash
+
 kafka-topics --bootstrap-server localhost:9092 --create --partitions 1 --replication-factor 1 --topic alunos ;
 ```
 
@@ -378,7 +386,7 @@ No outro terminal - linux
 
 //Se não estiver dentro do container
 
-docker exec -it kafka /bin/bash
+docker exec -it kafka-broker /bin/bash
 
 kafka-console-producer --bootstrap-server localhost:9092 --topic alunos --property parse.key=true --property key.separator=:
 
@@ -401,6 +409,38 @@ Agrupando as mensagens
 ```
 ^C
 select curso, count(*) from ALUNOS_STREAM  group by curso emit changes;
+```
+
+### Criando seu stream no formato json
+
+Terminal linux
+
+```
+kafka-topics --bootstrap-server localhost:9092 --create --topic professores --partitions 1 --replication-factor 1
+```
+
+Terminal KSqlDB
+
+```
+list topics;
+
+create stream professores_stream (id int, nome varchar , materia varchar, quantidadeaula int) with (kafka_topic='professores', value_format='json');
+
+show streams;
+
+select rowtime, id, nome from professores_stream emit changes;
+
+```
+
+
+Terminal linux
+
+```
+kafka-console-producer --bootstrap-server localhost:9092 --topic professores --property parse.key=true --property key.separator=:
+
+>professor1:{"id":1, "nome":"Fernando", "materia":"dados" , "quantidadeaula": 2}
+>professor2:{"id":2, "nome":"Fabio", "materia":"dados", "quantidadeaula": 4}
+>professor3:{"id":3, "nome":"Felipe", "materia":"dados", "quantidadeaula": 6}
 ```
 
 ### Visões Stream
@@ -460,12 +500,77 @@ select descricao from view_professores_stream emit changes;
   Stream com Table gera um novo Stream
 
 
+Terminal Linux
+```
+export SA_PASSWORD=Password!
+
+docker exec -i sqlserver /opt/mssql-tools/bin/sqlcmd -U sa -P $SA_PASSWORD -d dbEcommerce -Q "INSERT INTO pedidos(dataPedido)  VALUES (getdate());"
+
+docker exec -i sqlserver /opt/mssql-tools/bin/sqlcmd -U sa -P $SA_PASSWORD -d dbEcommerce -Q "INSERT INTO pedidosDetalhes(idPedido, idProduto )  VALUES (1,1);"
+
+
+```
+
+Terminal Ksql
 
 
 
 ```
-docker-compose  up -d mongo keycloak postman app async-minion 
+
+CREATE stream produto_stream (id integer , nome varchar, descricao varchar) WITH (KAFKA_TOPIC=' server.dbEcommerce.dbo.produtos',VALUE_FORMAT='json');
+
+CREATE TABLE produto_table AS
+    SELECT 
+        id,
+        latest_by_offset(nome) as nome,
+        latest_by_offset(descricao) as descricao
+    FROM 
+        produto_stream
+   GROUP BY id
+   EMIT CHANGES;
+
+show tables;
+
+select * from produto_table emit changes;
+
+
+CREATE STREAM pedidosdetalhes_stream (id integer, idPedido integer, idProduto integer) WITH (kafka_topic='server.dbEcommerce.dbo.pedidosDetalhes', value_format='json');
+
+CREATE STREAM pedidos_stream (id integer, dataPedido varchar) WITH (kafka_topic='server.dbEcommerce.dbo.pedidos', value_format='json');
+
+
+create stream  pedidos_produto_stream as
+select pedidos.id as idPedido, produtos.id as IdProduto, produtos.nome
+from pedidos_stream pedidos 
+left join pedidosdetalhes_stream pedidosdetalhes WITHIN 20 seconds  on pedidos.id = pedidosdetalhes.idPedido
+left join produto_table produtos on pedidosdetalhes.idProduto= produtos.id emit changes; 
+
+
 ```
+
+Inserindo as informações das tabelas do Sql Server
+
+```
+
+
+USE dbEcommerce;
+
+declare @idProduto as int, @idPedido as int
+
+INSERT INTO produtos(nome,descricao)  VALUES ('Lapis','lapis de escrever');
+
+select @idProduto= SCOPE_IDENTITY()
+
+insert into pedidos values(getdate())
+
+select @idPedido= SCOPE_IDENTITY()
+
+insert into pedidosDetalhes values (@idPedido, @idProduto)
+
+
+```
+
+### Observando o Grafana/Loki/Tempo
 
 ### Configurando MinIO
 
@@ -479,12 +584,12 @@ Acesso para o MinIO http://localhost:9001/login
 
 ### Configurando o MinIO
 
-![MinIO](../content/minio-01.png)
-![MinIO](../content/minio-02.png)
-![MinIO](../content/minio-03.png)
-![MinIO](../content/minio-04.png)
-![MinIO](../content/minio-05.png)
-![MinIO](../content/minio-06.png)
+![MinIO](content/minio-01.png)
+![MinIO](content/minio-02.png)
+![MinIO](content/minio-03.png)
+![MinIO](content/minio-04.png)
+![MinIO](content/minio-05.png)
+![MinIO](content/minio-06.png)
 
 
 Instalando o conector do MinIO
@@ -492,13 +597,7 @@ Instalando o conector do MinIO
 > Não esqueçam de mudar os campos  `aws.access.key.id` e `aws.secret.access.key` do arquivo `conector-minio.json`
 
 ```
-cd ../../lab-kafka-connect/
-
 http PUT http://localhost:8083/connectors/connector-minio/config < conector-minio.json
-
-//Ou via powershell
-$response = Invoke-WebRequest -Uri "http://localhost:8083/connectors/connector-minio/config" -Method Put -Body (Get-Content -Path "conector-minio.json" -Raw) -ContentType "application/json"; $response.Content
-
 
 ```
 
@@ -508,39 +607,3 @@ Listando os conectores
 docker exec -it kafkaConect curl http://localhost:8083/connectors/
 ```
 
-Será que deu certo??
-
-Vamos inserir um novo registro na tabela products no banco de dados do Postgres
-
-```
-INSERT INTO inventory.products(	id, name, description, weight)
-VALUES (112, 'Lapis', 'O melhor', 1);
-```
-
-
-## Desafio
-
-
-
-*Fazer o Sinc para o Mongodb*
-
-![Exemplo Kafka Conect](../content/sinc.png)
-
-
->Dicas
-
-```
-//Download do Plugin do Kafka Connect
- wget https://repo1.maven.org/maven2/org/mongodb/kafka/mongo-kafka-connect/1.6.1/mongo-kafka-connect-1.6.1-all.jar -P plugin
-
-//Instalação do Mongodb mongo-connect
-docker-compose up -d mongo-connect
-
- http PUT http://localhost:8083/connectors/sinc-mongodb/config < sinc-mongodb.json
-
- ```
-
- > Lab Mongodb
- [LAB NOSQL](../lab-nosql/README.md)
-
- https://github.com/nandorsilva/arc-dados/tree/main/lab-nosql
