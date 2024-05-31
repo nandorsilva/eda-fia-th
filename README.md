@@ -577,8 +577,6 @@ insert into pedidosDetalhes values (@idPedido, @idProduto)
 
 ```
 
-### Observando o Grafana/Loki/Tempo
-
 
 
 ### Configurando MinIO
@@ -616,3 +614,20 @@ Listando os conectores
 docker exec -it kafkaConect curl http://localhost:8083/connectors/
 ```
 
+### Executando a aplicação Net para leitura das mensagens em Kafka
+
+Observandos os novos tópicos
+
+```
+docker exec -it kafka-broker /bin/bash
+kafka-topics --bootstrap-server localhost:9092 --list 
+
+kafka-console-consumer --bootstrap-server localhost:9092 --topic produtos_change --property print.headers=true  --property print.timestamp=true --property print.key=true --property print.value=true --property print.partition=true --from-beginning
+
+
+
+```
+
+### Acessando o Grafana Loki
+
+> http://localhost:3000/
