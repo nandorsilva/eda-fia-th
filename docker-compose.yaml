@@ -8,14 +8,15 @@ services:
       GF_PATHS_DATA : /var/lib/grafana
       GF_SECURITY_ADMIN_PASSWORD : kafka
     volumes:
-     - ./grafana/provisioning:/etc/grafana/provisioning
-     - ./grafana/dashboards:/var/lib/grafana/dashboards     
+     - ./grafana/provisioning:/etc/grafana/provisioning     
      - grafana-data:/var/lib/grafana
     container_name: grafana
     depends_on:
       - prometheus
       - tempo
       - loki    
+    networks:
+      otel:
     
 
   prometheus:
@@ -27,6 +28,8 @@ services:
      - prometheus:/prometheus
     command: "--config.file=/etc/prometheus/prometheus.yml"
     container_name: prometheus
+    networks:
+      otel:
 
   tempo:
     
@@ -36,14 +39,15 @@ services:
     volumes:   
       - /etc/localtime:/etc/localtime:ro   
       - ./etc/tempo/tempo.yml:/etc/tempo.yaml    
-      - ./etc/tempo:/tmp/tempo 
+      - tempo:/tmp/tempo
     restart: unless-stopped
     ports:
       - 3200:3200  # tempo
       - 4007:4317  # otlp grpc
     depends_on:
       - otel-collector
-
+    networks:
+      otel:
 
   loki:
 
@@ -57,7 +61,8 @@ services:
     restart: unless-stopped
     ports:
       - 3100:3100
-
+    networks:
+      otel:
 
   otel-collector:
     
@@ -74,13 +79,15 @@ services:
       - 4317:4317   # OTLP gRPC receiver
       - 9200:55679  # zpages
       - 13133:13133 # Health check
-
+    networks:
+      otel:
   
   jaeger-all-in-one:
     image: jaegertracing/all-in-one:latest
     ports:
       - "16686:16686"
-
+    networks:
+      otel:
 
   zookeeper:
     image: confluentinc/cp-zookeeper:${CONFLUENT_VERSION}
@@ -92,7 +99,8 @@ services:
     ports:
      - "2181:2181"
     container_name: zookeeper
-
+    networks:
+      otel:
 
   kafka-broker:
     image: confluentinc/cp-kafka:${CONFLUENT_VERSION}
@@ -119,7 +127,8 @@ services:
       CONFLUENT_METRICS_ENABLE: 'false'
       KAFKA_HEAP_OPTS: ${KAFKA_BROKER_HEAP_OPTS}
     mem_limit: ${KAFKA_BROKER_MEM_LIMIT}
-
+    networks:
+      otel:
 
 
   akhq:
@@ -140,7 +149,8 @@ services:
     depends_on:
       - kafka-broker    
       - connect
-
+    networks:
+      otel:
 
   kafka-net:
       image: fernandos/kafka-net:v0
@@ -151,7 +161,8 @@ services:
           - kafka-broker       
       ports:
         - "5000:80"
- 
+      networks:
+        otel:
 
   mongo:
     image: mongo:${MONGODB_MICROCKS_VERSION}
@@ -173,11 +184,14 @@ services:
       - "./keycloak-realm/microcks-realm-sample.json:/opt/keycloak/data/import/microcks-realm.json"
     command:
       - start-dev --import-realm
-
+    networks:
+      otel:
 
   postman:
     image: quay.io/microcks/microcks-postman-runtime:${POSTMAN_MICROCKS_VERSION}
     container_name: microcks-postman-runtime
+    networks:
+      otel:
 
   app:
     depends_on:
@@ -204,6 +218,8 @@ services:
       - JAVA_OPTIONS=-Dspring.security.oauth2.resourceserver.jwt.issuer-uri=http://localhost:18080/realms/microcks -Dspring.security.oauth2.resourceserver.jwt.jwk-set-uri=http://keycloak:8080/realms/microcks/protocol/openid-connect/certs
       - ASYNC_MINION_URL=http://microcks-async-minion:8081
       - KAFKA_BOOTSTRAP_SERVER=kafka-broker:29092
+    networks:
+      otel:
 
   async-minion:
     depends_on:
@@ -218,6 +234,8 @@ services:
       - "./config:/deployments/config"
     environment:
       - QUARKUS_PROFILE=docker-compose
+    networks:
+      otel:
 
   connect:
         image: fernandos/kafka-connet-debezium-lab:v213
@@ -251,7 +269,8 @@ services:
         - OTEL_METRICS_EXPORTER=none
         - STRIMZI_TRACING=opentelemetry   
         command: /opt/kafka/kafka_connect_run.sh
-
+        networks:
+          otel:
 
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2019-latest
@@ -266,8 +285,8 @@ services:
     stdin_open: true
     volumes:
       - /sql/init.sql:/opt/sql_scripts/init.sql
-    
-
+    networks:
+      otel:
 
   postgres:
     image: quay.io/debezium/example-postgres:2.1
@@ -277,6 +296,9 @@ services:
     environment:
      - POSTGRES_USER=postgres
      - POSTGRES_PASSWORD=postgres
+    networks:
+      otel:
+
   pgadmin:
     container_name: pgadmin_container
     image: dpage/pgadmin4
@@ -287,14 +309,16 @@ services:
       - "5433:80"
     depends_on:
       - postgres    
-   
+    networks:
+      otel:
 
   mongo-connect:
     image: mongo:3.4.23
     container_name: mongo-connect
     volumes:
       - "~/tmp/mongodbdata:/data/db"
-
+    networks:
+      otel:
 
   ksqldb-server:
     image: confluentinc/cp-ksqldb-server:${KSQLDB_VER}
@@ -312,7 +336,8 @@ services:
       KSQL_CONFLUENT_SUPPORT_METRICS_ENABLE: "false"        
     volumes:
       - ./scripts:/scripts
-
+    networks:
+      otel:
 
   minio:
     image:  quay.io/minio/minio
@@ -327,7 +352,8 @@ services:
       MINIO_ACCESS_KEY: cursolab
       MINIO_SECRET_KEY: cursolab
     command: server --console-address ":9001" /data
-
+    networks:
+      otel:
 
   ksqldb-cli:
     image: confluentinc/cp-ksqldb-cli:${KSQLDB_VER}
@@ -339,7 +365,11 @@ services:
       - ./scripts:/scripts
     entrypoint: /bin/sh
     tty: true
+    networks:
+      otel:
 
+networks:
+  otel:
 
 volumes:
   minio_storage: {}

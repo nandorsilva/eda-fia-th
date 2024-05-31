@@ -111,6 +111,8 @@ Algumas informações básicas sobre o connector:
 
 Listando os conectores
 
+> https://docs.confluent.io/platform/current/connect/references/restapi.html
+
 ```
 docker exec -it kafkaConect curl http://localhost:8083/connectors/
 ```
@@ -124,14 +126,15 @@ http http://localhost:8083/connectors/connector-sql/status
 
 ### Navegando pelo Akhq ?
 
-* AKHQ http://localhost:8080/ui
 
 Vamos tirar o comentario do conector no serviço akhq do arquivo docker-compose caso ainda o tenha.
 
 ```
-cd ../lab-eda/ambiente/
 docker-compose up -d akhq
 ```
+
+* AKHQ http://localhost:8080/ui
+
 
 
 ### Testando o Conector
@@ -161,7 +164,6 @@ kafka-topics --bootstrap-server localhost:9092 --list
 ```
 
 kafka-console-consumer --bootstrap-server localhost:9092 --topic server.dbEcommerce.dbo.produtos --property print.headers=true  --property print.timestamp=true --property print.key=true --property print.value=true --property print.partition=true --from-beginning
-
 
 ```
 
@@ -212,8 +214,6 @@ O cliente geralmente não envia todos os rastreamentos ao agente, mas geralmente
 docker-compose up -d jaeger-all-in-one 
 
 docker container ls
-
-
 
 ```
 
@@ -300,10 +300,13 @@ kafka-console-consumer --bootstrap-server localhost:9092 --topic <<nome do tópi
 
 ## KSqldb
 
-Entrando no container cli
+
 
 ```
 docker-compose up -d  ksqldb-server ksqldb-cli 
+
+//Entrando no container cli
+
 docker-compose exec ksqldb-cli ksql http://ksqldb-server:8088
 ```
 
@@ -511,13 +514,16 @@ docker exec -i sqlserver /opt/mssql-tools/bin/sqlcmd -U sa -P $SA_PASSWORD -d db
 
 ```
 
+![Join](content/kstream-join.png)
+
+
 Terminal Ksql
 
 
 
 ```
 
-CREATE stream produto_stream (id integer , nome varchar, descricao varchar) WITH (KAFKA_TOPIC=' server.dbEcommerce.dbo.produtos',VALUE_FORMAT='json');
+CREATE stream produto_stream (id varchar , nome varchar, descricao varchar) WITH (KAFKA_TOPIC=' server.dbEcommerce.dbo.produtos',VALUE_FORMAT='json');
 
 CREATE TABLE produto_table AS
     SELECT 
@@ -534,7 +540,7 @@ show tables;
 select * from produto_table emit changes;
 
 
-CREATE STREAM pedidosdetalhes_stream (id integer, idPedido integer, idProduto integer) WITH (kafka_topic='server.dbEcommerce.dbo.pedidosDetalhes', value_format='json');
+CREATE STREAM pedidosdetalhes_stream (id integer, idPedido integer, idProduto varchar) WITH (kafka_topic='server.dbEcommerce.dbo.pedidosDetalhes', value_format='json');
 
 CREATE STREAM pedidos_stream (id integer, dataPedido varchar) WITH (kafka_topic='server.dbEcommerce.dbo.pedidos', value_format='json');
 
@@ -545,19 +551,21 @@ from pedidos_stream pedidos
 left join pedidosdetalhes_stream pedidosdetalhes WITHIN 20 seconds  on pedidos.id = pedidosdetalhes.idPedido
 left join produto_table produtos on pedidosdetalhes.idProduto= produtos.id emit changes; 
 
+describe pedidos_produto_stream;
+
+
+select * from pedidos_produto_stream emit changes;
 
 ```
 
 Inserindo as informações das tabelas do Sql Server
 
 ```
-
-
 USE dbEcommerce;
 
-declare @idProduto as int, @idPedido as int
-
 INSERT INTO produtos(nome,descricao)  VALUES ('Lapis','lapis de escrever');
+
+declare @idProduto as int, @idPedido as int
 
 select @idProduto= SCOPE_IDENTITY()
 
@@ -566,7 +574,6 @@ insert into pedidos values(getdate())
 select @idPedido= SCOPE_IDENTITY()
 
 insert into pedidosDetalhes values (@idPedido, @idProduto)
-
 
 ```
 
