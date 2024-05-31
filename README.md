@@ -579,6 +579,8 @@ insert into pedidosDetalhes values (@idPedido, @idProduto)
 
 ### Observando o Grafana/Loki/Tempo
 
+
+
 ### Configurando MinIO
 
 
