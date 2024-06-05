@@ -50,6 +50,27 @@ docker-compose up -d grafana prometheus zookeeper kafka-broker akhq connect sqls
 docker container ls
 ```
 
+## O que acontenceu ?
+
+## Acesso WebUI dos componentes
+
+
+* AKHQ http://localhost:8080/ui
+* Prometeus http://localhost:9090/
+* jmx-prometheus-exporter http://localhost:5556/
+* Grafana http://localhost:3000/login
+
+## Acessos
+
+
+Grafana
+
+* user : `admin`
+* password : `kafka`
+
+---
+
+
 Listando os plugins existentes, os padrões da imagem e do debezium que foi inserido na imagem, via arquivo `Dockerfile`
 
 ```
@@ -622,7 +643,7 @@ Observandos os novos tópicos
 docker exec -it kafka-broker /bin/bash
 kafka-topics --bootstrap-server localhost:9092 --list 
 
-kafka-console-consumer --bootstrap-server localhost:9092 --topic produtos_change --property print.headers=true  --property print.timestamp=true --property print.key=true --property print.value=true --property print.partition=true --from-beginning
+kafka-console-consumer --bootstrap-server localhost:9092 --topic produtos --property print.headers=true  --property print.timestamp=true --property print.key=true --property print.value=true --property print.partition=true --from-beginning
 
 
 
@@ -631,3 +652,9 @@ kafka-console-consumer --bootstrap-server localhost:9092 --topic produtos_change
 ### Acessando o Grafana Loki
 
 > http://localhost:3000/
+
+Grafana
+
+* user : `admin`
+* password : `kafka`
+
