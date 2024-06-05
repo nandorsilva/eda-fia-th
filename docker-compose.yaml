@@ -22,7 +22,7 @@ services:
   prometheus:
     image: "prom/prometheus:${PROMETHEUS_VERSION}"
     ports:
-     - "9090:9090"
+     - "9091:9090"
     volumes:
      - ./etc/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
      - prometheus:/prometheus
@@ -145,7 +145,7 @@ services:
                 - name: "connect"
                   url: "http://connect:8083"
     ports:
-      - "8080:8080"
+      - "8082:8080"
     depends_on:
       - kafka-broker    
       - connect
@@ -164,12 +164,31 @@ services:
       networks:
         otel:
 
+  kafka-api:
+      image: fernandos/api-demo-kafka
+      container_name: kafka-api        
+      depends_on:
+          - kafka-broker   
+      networks:
+         otel:
+
+  kafka-worker:
+      image: fernandos/worker-demo-kafka
+      container_name: kafkaworker        
+      depends_on:
+          - kafka-broker   
+          - kafka-api
+      networks:
+         otel:
+
+
   mongo:
     image: mongo:${MONGODB_MICROCKS_VERSION}
     container_name: microcks-db
     volumes:
       - "~/tmp/microcks-data:/data/db"
-
+    networks:
+        otel:
   keycloak:
     image: quay.io/keycloak/keycloak:${KEYCLOAK_MICROCKS_VERSION}
     container_name: microcks-sso
